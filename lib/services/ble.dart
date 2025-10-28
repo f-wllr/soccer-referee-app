@@ -28,6 +28,8 @@ class BLEServices {
     if (state == BluetoothAdapterState.on) {
       // usually start scanning, connecting, etc
       status = 'OK';
+    } else if (state == BluetoothAdapterState.unavailable) {
+      status = 'No connection';
     } else {
       // show an error to the user, etc
       print('off');

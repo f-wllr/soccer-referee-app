@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -130,17 +132,14 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
     super.dispose();
   }
 
-  var maskFormatter =  MaskTextInputFormatter(
-    mask: '##:##:##:##:##:##',
-    filter: {"#" : RegExp('[0-9A-Fa-f:]')},
-    //type: MaskAutoCompletionType.lazy,
+  var maskFormatter = MaskTextInputFormatter(
+    mask: (!kIsWeb && Platform.isIOS)
+        ? '########-####-####-####-############'
+        : '##:##:##:##:##:##',
+    filter: (!kIsWeb && Platform.isIOS)
+        ? {"#": RegExp('[0-9A-Fa-f-]')}
+        : {"#": RegExp('[0-9A-Fa-f:]')},
   );
-
-
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -194,15 +193,15 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
               controller: _controller,
               inputFormatters: [maskFormatter],
               decoration: InputDecoration(
-                labelText: 'Enter MAC Address',
+                labelText: (!kIsWeb && Platform.isIOS) ? 'Enter device UUID' : 'Enter MAC Address',
                 labelStyle: TextStyle(color: Colors.grey),
-                hintText: 'xx:xx:xx:xx:xx:xx',
+                hintText: (!kIsWeb && Platform.isIOS) ? 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' :'xx:xx:xx:xx:xx:xx',
                 hintStyle: TextStyle(color: Colors.grey),
                 border: OutlineInputBorder(),
 
               ),
               style: TextStyle(color: Colors.white),
-              maxLength: 17,
+              maxLength: (!kIsWeb && Platform.isIOS) ? 36 : 17,
             ),
             SizedBox(height: 5),
             Container(
