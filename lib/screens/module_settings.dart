@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -298,10 +299,65 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
           );
           if (!context.mounted) return;
           if (result != null) {
-            _controller.text = result;
+            //result = 'RCJ-soccer_module-XX:XX:XX:XX:XX:XX'
+            // --> map result (ble device name) to uuid
+            if(!kIsWeb && Platform.isIOS){
+              handleIosResult(result);
+            } else {
+              _controller.text = result;
+            }
           }
         },
       );
+    }
+
+    Future<void> handleIosResult(dynamic pResult) async {
+      bool validResult = false;
+      String? bleDeviceName = 'RCJ-soccer_module-$pResult';
+      print(bleDeviceName);
+
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 3));
+
+      await for (final results in FlutterBluePlus.scanResults.timeout(
+        const Duration(seconds: 3),
+        onTimeout: (sink) => sink.close(),
+      )) {
+        for (ScanResult r in results) {
+          if (r.device.platformName == bleDeviceName) {
+            //print('App-specific UUID: ${r.device.remoteId}');
+            _controller.text = r.device.remoteId.toString();
+            validResult = true;
+            await FlutterBluePlus.stopScan();
+            break;
+          }
+        }
+
+        if (validResult) break;
+      }
+
+      await FlutterBluePlus.stopScan();
+
+      //Error handling if no device to mac was found
+      if (!validResult && context.mounted) {
+        await showCupertinoDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return CupertinoAlertDialog(
+              title: const Text('No device found'),
+              content: const Text('No device was found matching the MAC address you scanned'),
+              actions: [
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () {
+                    Navigator.of(context).pop(); // 👈 closes the dialog
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
     }
 
 
