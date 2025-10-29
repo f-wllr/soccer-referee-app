@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth is required to connect to the robots communication module</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required when scanning a QR Code to connect to a communication module</string>
 </dict>
 </plist>
