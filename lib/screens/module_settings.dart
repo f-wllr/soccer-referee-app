@@ -80,7 +80,7 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
     await FlutterBluePlus.startScan(
       //withNames: ['RCJ-soccer_module'],
       //withServices: [Guid('6E400002-B5A3-F393-E0A9-E50E24DCCA9E')],
-      withKeywords: ['RCJ', 'soccer', 'module'],
+      withKeywords: ['RCJ'],
       timeout: const Duration(seconds: 3),
     );
     FlutterBluePlus.scanResults.listen((results) {
@@ -313,7 +313,7 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
 
     Future<void> handleIosResult(dynamic pResult) async {
       bool validResult = false;
-      String? bleDeviceName = 'RCJ-soccer_module-$pResult';
+      String? bleDeviceName = 'RCJs-m_$pResult';
       print(bleDeviceName);
 
       await FlutterBluePlus.startScan(timeout: const Duration(seconds: 3));
