@@ -27,6 +27,7 @@ class Game with ChangeNotifier {
   int _numberOfPlaying = 0;
   MatchStage currentStage = MatchStage.firstHalf;
   Timer? _timer;
+  DateTime? _lastTimerTickAt;
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
@@ -110,55 +111,73 @@ class Game with ChangeNotifier {
       _isGameRunning = true;
     }
     isTimeRunning = true;
+    _lastTimerTickAt = DateTime.now();
     notifyListeners();
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (_remainingTime > 0) {
-        _remainingTime--;
-        notifyAllModulesTimer();
-        
-        mqttService.publishTime(_remainingTime);
+    _timer = Timer.periodic(Duration(seconds: 1), (_) {
+      if (!isTimeRunning) {
+        return;
       }
 
-      if (_remainingTime <= 0) {
-        _isGameRunning = false;
-        isTimeRunning = false;
-        timer.cancel();
-
-        switch (currentStage) {
-          case MatchStage.firstHalf:
-            currentStage = MatchStage.halfTime;
-            _remainingTime = halfTimeDuration;
-            startTimer();
-            timerButtonText = 'SKIP';
-            halfTimeAll();
-            // Trigger the callback to show the dialog
-            if (onRequestSwitchTeamOrderDialog != null) {
-              onRequestSwitchTeamOrderDialog!();
-            }
-          case MatchStage.halfTime:
-            currentStage = MatchStage.secondHalf;
-            _remainingTime = periodTime;
-            stopAll(true, force: true);
-            timerButtonText = 'START';
-          case MatchStage.secondHalf:
-            currentStage = MatchStage.fullTime;
-            stopAll(true);
-            timerButtonText = 'REPEAT';
-            gameOverAll();
-          default:
-            print('unknown match stage');
-        }
-
-        mqttService.publishGameState(currentStage);
-        mqttService.publishTime(_remainingTime);
+      final now = DateTime.now();
+      final lastTick = _lastTimerTickAt ?? now;
+      final elapsedSeconds = now.difference(lastTick).inSeconds;
+      if (elapsedSeconds <= 0) {
+        return;
       }
+      _lastTimerTickAt = lastTick.add(Duration(seconds: elapsedSeconds));
 
-      if (currentStage == MatchStage.halfTime && _remainingTime % 30 == 0) {
-        halfTimeSyncTimeAll();
+      for (var i = 0; i < elapsedSeconds && isTimeRunning; i++) {
+        _tickTimer();
       }
-
-      notifyListeners();
     });
+  }
+
+  void _tickTimer() {
+    if (_remainingTime > 0) {
+      _remainingTime--;
+      notifyAllModulesTimer();
+      mqttService.publishTime(_remainingTime);
+    }
+
+    if (_remainingTime <= 0) {
+      _isGameRunning = false;
+      isTimeRunning = false;
+      _timer?.cancel();
+
+      switch (currentStage) {
+        case MatchStage.firstHalf:
+          currentStage = MatchStage.halfTime;
+          _remainingTime = halfTimeDuration;
+          startTimer();
+          timerButtonText = 'SKIP';
+          halfTimeAll();
+          // Trigger the callback to show the dialog
+          if (onRequestSwitchTeamOrderDialog != null) {
+            onRequestSwitchTeamOrderDialog!();
+          }
+        case MatchStage.halfTime:
+          currentStage = MatchStage.secondHalf;
+          _remainingTime = periodTime;
+          stopAll(true, force: true);
+          timerButtonText = 'START';
+        case MatchStage.secondHalf:
+          currentStage = MatchStage.fullTime;
+          stopAll(true);
+          timerButtonText = 'REPEAT';
+          gameOverAll();
+        default:
+          print('unknown match stage');
+      }
+
+      mqttService.publishGameState(currentStage);
+      mqttService.publishTime(_remainingTime);
+    }
+
+    if (currentStage == MatchStage.halfTime && _remainingTime % 30 == 0) {
+      halfTimeSyncTimeAll();
+    }
+
+    notifyListeners();
   }
 
   void toggleTimer() {
@@ -177,6 +196,7 @@ class Game with ChangeNotifier {
       _isGameRunning = false;
       isTimeRunning = false;
       _timer?.cancel();
+      _lastTimerTickAt = null;
       currentStage = MatchStage.secondHalf;
       _remainingTime = periodTime;
       stopAll(true, force: true);
@@ -234,6 +254,7 @@ class Game with ChangeNotifier {
     _isGameRunning = false;
     isTimeRunning = false;
     _timer?.cancel();
+    _lastTimerTickAt = null;
     notifyListeners();
   }
 
@@ -404,5 +425,3 @@ int getScore(String team, {bool oppositeTeam = false}) {
   }
 
 }
-
-
