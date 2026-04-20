@@ -127,10 +127,26 @@ class Game with ChangeNotifier {
       }
       _lastTimerTickAt = now;
 
-      for (var i = 0; i < elapsedSeconds && isTimeRunning; i++) {
+      final maxCatchUpTicks = _maxCatchUpTicks();
+      final ticksToProcess =
+          elapsedSeconds < maxCatchUpTicks ? elapsedSeconds : maxCatchUpTicks;
+      for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
         _tickTimer();
       }
     });
+  }
+
+  int _maxCatchUpTicks() {
+    switch (currentStage) {
+      case MatchStage.firstHalf:
+        return _remainingTime + halfTimeDuration + periodTime;
+      case MatchStage.halfTime:
+        return _remainingTime + periodTime;
+      case MatchStage.secondHalf:
+        return _remainingTime;
+      case MatchStage.fullTime:
+        return 0;
+    }
   }
 
   void _tickTimer() {
