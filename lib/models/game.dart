@@ -121,10 +121,11 @@ class Game with ChangeNotifier {
       final now = DateTime.now();
       final lastTick = _lastTimerTickAt ?? now;
       final elapsedSeconds = now.difference(lastTick).inSeconds;
+      // inSeconds truncates sub-second differences; skip until at least 1 full second elapsed.
       if (elapsedSeconds <= 0) {
         return;
       }
-      _lastTimerTickAt = lastTick.add(Duration(seconds: elapsedSeconds));
+      _lastTimerTickAt = now;
 
       for (var i = 0; i < elapsedSeconds && isTimeRunning; i++) {
         _tickTimer();
