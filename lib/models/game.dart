@@ -279,6 +279,14 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
           .clamp(0, _runClockStartRemainingTime!)
           .toInt();
 
+      if (_remainingTime < expectedRemaining) {
+        _remainingTime = expectedRemaining;
+        mqttService.publishTime(_remainingTime);
+        notifyListeners();
+        return;
+      }
+
+      // If remaining time is higher than expected, local ticking lagged behind.
       final ticksBehind = _remainingTime > expectedRemaining
           ? _remainingTime - expectedRemaining
           : 0;
