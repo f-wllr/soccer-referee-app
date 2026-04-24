@@ -267,9 +267,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       return;
     }
 
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
-      _backgroundedAt ??= DateTime.now();
+    if (state == AppLifecycleState.paused) {
+      _backgroundedAt = DateTime.now();
       return;
     }
 
