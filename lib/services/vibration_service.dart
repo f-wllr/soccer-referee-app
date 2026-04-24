@@ -7,7 +7,7 @@ const List<int> kVibrationAlertOptions = [10, 5, 3, 0];
 class VibrationService with ChangeNotifier {
   bool _gameTimerEnabled = true;
   bool _damageTimerEnabled = true;
-  Set<int> _gameTimerAlerts = {10, 5, 0};
+  Set<int> _gameTimerAlerts = {10, 5, 3, 0};
   Set<int> _damageTimerAlerts = {5, 0};
 
   late SharedPreferences _prefs;

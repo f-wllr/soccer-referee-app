@@ -251,6 +251,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   }
 
   void notifyAllModulesTimer() {
+    // Use flags so that at most one vibration fires per timer tick even if
+    // multiple modules hit a threshold simultaneously.
     bool vibrateEndTriggered = false;
     bool vibrateWarningTriggered = false;
 
