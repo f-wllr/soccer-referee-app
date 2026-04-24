@@ -27,9 +27,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   int _numberOfPlaying = 0;
   MatchStage currentStage = MatchStage.firstHalf;
   Timer? _timer;
-  DateTime? _backgroundedAt;
-  int? _remainingTimeAtBackground;
-  MatchStage? _stageAtBackground;
+  DateTime? _runClockStartedAt;
+  int? _runClockStartRemainingTime;
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
@@ -115,9 +114,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       _isGameRunning = true;
     }
     isTimeRunning = true;
-    _backgroundedAt = null;
-    _remainingTimeAtBackground = null;
-    _stageAtBackground = null;
+    _runClockStartedAt = DateTime.now();
+    _runClockStartRemainingTime = _remainingTime;
     notifyListeners();
     _timer = Timer.periodic(Duration(seconds: 1), (_) {
       if (isTimeRunning) {
@@ -203,9 +201,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       _isGameRunning = false;
       isTimeRunning = false;
       _timer?.cancel();
-      _backgroundedAt = null;
-      _remainingTimeAtBackground = null;
-      _stageAtBackground = null;
+      _runClockStartedAt = null;
+      _runClockStartRemainingTime = null;
       currentStage = MatchStage.secondHalf;
       _remainingTime = periodTime;
       stopAll(true, force: true);
@@ -263,9 +260,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
     _isGameRunning = false;
     isTimeRunning = false;
     _timer?.cancel();
-    _backgroundedAt = null;
-    _remainingTimeAtBackground = null;
-    _stageAtBackground = null;
+    _runClockStartedAt = null;
+    _runClockStartRemainingTime = null;
     notifyListeners();
   }
 
@@ -275,40 +271,20 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       return;
     }
 
-    if (state == AppLifecycleState.paused) {
-      _backgroundedAt = DateTime.now();
-      _remainingTimeAtBackground = _remainingTime;
-      _stageAtBackground = currentStage;
-      return;
-    }
+    if (state == AppLifecycleState.resumed &&
+        _runClockStartedAt != null &&
+        _runClockStartRemainingTime != null) {
+      final elapsedSeconds = DateTime.now().difference(_runClockStartedAt!).inSeconds;
+      final expectedRemaining = (_runClockStartRemainingTime! - elapsedSeconds)
+          .clamp(0, _runClockStartRemainingTime!)
+          .toInt();
 
-    if (state == AppLifecycleState.resumed && _backgroundedAt != null) {
-      final elapsedSeconds = DateTime.now().difference(_backgroundedAt!).inSeconds;
-
-      var alreadyProcessedTicks = 0;
-      if (_remainingTimeAtBackground != null &&
-          _remainingTimeAtBackground! >= 0 &&
-          _remainingTime >= 0 &&
-          _stageAtBackground == currentStage &&
-          _remainingTimeAtBackground! > _remainingTime) {
-        alreadyProcessedTicks = _remainingTimeAtBackground! - _remainingTime;
-      }
-      // Never discount more ticks than elapsed wall-clock seconds.
-      if (alreadyProcessedTicks > elapsedSeconds) {
-        alreadyProcessedTicks = elapsedSeconds;
-      }
-
-      _backgroundedAt = null;
-      _remainingTimeAtBackground = null;
-      _stageAtBackground = null;
-
-      final effectiveElapsedSeconds = elapsedSeconds > alreadyProcessedTicks
-          ? elapsedSeconds - alreadyProcessedTicks
+      final ticksBehind = _remainingTime > expectedRemaining
+          ? _remainingTime - expectedRemaining
           : 0;
-
       final maxResumeCatchUpTicks = _maxResumeCatchUpTicks();
-      final ticksToProcess = effectiveElapsedSeconds < maxResumeCatchUpTicks
-          ? effectiveElapsedSeconds
+      final ticksToProcess = ticksBehind < maxResumeCatchUpTicks
+          ? ticksBehind
           : maxResumeCatchUpTicks;
       for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
         _tickTimer();
