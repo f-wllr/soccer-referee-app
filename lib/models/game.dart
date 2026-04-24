@@ -251,26 +251,20 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   }
 
   void notifyAllModulesTimer() {
-    // Use flags so that at most one vibration fires per timer tick even if
+    // Use a flag so that at most one vibration fires per timer tick even if
     // multiple modules hit a threshold simultaneously.
-    bool vibrateEndTriggered = false;
-    bool vibrateWarningTriggered = false;
+    bool vibrateTriggered = false;
 
     for (var team in teams) {
       for (var module in team.modules.where((module) => module.isEnabled && module.state == ModuleState.damage)) {
         final penaltyBefore = module.penaltyTime;
         module.notifyTimer();
 
-        if (vibrationService.damageTimerEnabled && penaltyBefore > 0) {
+        if (!vibrateTriggered && vibrationService.damageTimerEnabled && penaltyBefore > 0) {
           final penaltyAfter = module.penaltyTime;
           if (vibrationService.damageTimerAlerts.contains(penaltyAfter)) {
-            if (penaltyAfter == 0 && !vibrateEndTriggered) {
-              vibrateEndTriggered = true;
-              VibrationService.vibrateEnd();
-            } else if (penaltyAfter > 0 && !vibrateWarningTriggered) {
-              vibrateWarningTriggered = true;
-              VibrationService.vibrateWarning();
-            }
+            vibrateTriggered = true;
+            vibrationService.vibrateDamageTimer();
           }
         }
       }
@@ -283,11 +277,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
         currentStage != MatchStage.secondHalf) return;
     if (!vibrationService.gameTimerAlerts.contains(_remainingTime)) return;
 
-    if (_remainingTime == 0) {
-      VibrationService.vibrateEnd();
-    } else {
-      VibrationService.vibrateWarning();
-    }
+    vibrationService.vibrateGameTimer();
   }
 
 

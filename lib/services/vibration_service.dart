@@ -4,11 +4,35 @@ import 'package:vibration/vibration.dart';
 
 const List<int> kVibrationAlertOptions = [10, 5, 3, 0];
 
+enum VibrationPattern {
+  short,
+  long,
+  doubleBuzz,
+  pulse,
+}
+
+extension VibrationPatternDisplay on VibrationPattern {
+  String get displayName {
+    switch (this) {
+      case VibrationPattern.short:
+        return 'Short (200ms)';
+      case VibrationPattern.long:
+        return 'Long (600ms)';
+      case VibrationPattern.doubleBuzz:
+        return 'Double buzz';
+      case VibrationPattern.pulse:
+        return 'Pulse (long-short-long)';
+    }
+  }
+}
+
 class VibrationService with ChangeNotifier {
   bool _gameTimerEnabled = true;
   bool _damageTimerEnabled = true;
   Set<int> _gameTimerAlerts = {10, 5, 3, 0};
   Set<int> _damageTimerAlerts = {5, 0};
+  VibrationPattern _gameTimerPattern = VibrationPattern.pulse;
+  VibrationPattern _damageTimerPattern = VibrationPattern.doubleBuzz;
 
   late SharedPreferences _prefs;
   bool _prefsLoaded = false;
@@ -38,6 +62,20 @@ class VibrationService with ChangeNotifier {
           damageAlerts.map((e) => int.parse(e)).toSet();
     }
 
+    final gamePatternIdx = _prefs.getInt('vibration_game_timer_pattern');
+    if (gamePatternIdx != null &&
+        gamePatternIdx >= 0 &&
+        gamePatternIdx < VibrationPattern.values.length) {
+      _gameTimerPattern = VibrationPattern.values[gamePatternIdx];
+    }
+
+    final damagePatternIdx = _prefs.getInt('vibration_damage_timer_pattern');
+    if (damagePatternIdx != null &&
+        damagePatternIdx >= 0 &&
+        damagePatternIdx < VibrationPattern.values.length) {
+      _damageTimerPattern = VibrationPattern.values[damagePatternIdx];
+    }
+
     _prefsLoaded = true;
     notifyListeners();
   }
@@ -62,6 +100,24 @@ class VibrationService with ChangeNotifier {
 
   Set<int> get gameTimerAlerts => _gameTimerAlerts;
   Set<int> get damageTimerAlerts => _damageTimerAlerts;
+
+  VibrationPattern get gameTimerPattern => _gameTimerPattern;
+  set gameTimerPattern(VibrationPattern value) {
+    _gameTimerPattern = value;
+    if (_prefsLoaded) {
+      _prefs.setInt('vibration_game_timer_pattern', value.index);
+    }
+    notifyListeners();
+  }
+
+  VibrationPattern get damageTimerPattern => _damageTimerPattern;
+  set damageTimerPattern(VibrationPattern value) {
+    _damageTimerPattern = value;
+    if (_prefsLoaded) {
+      _prefs.setInt('vibration_damage_timer_pattern', value.index);
+    }
+    notifyListeners();
+  }
 
   void toggleGameTimerAlert(int seconds) {
     if (_gameTimerAlerts.contains(seconds)) {
@@ -89,22 +145,44 @@ class VibrationService with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Short vibration for timer warning alerts (e.g. 10, 5, 3 sec remaining).
-  static Future<void> vibrateWarning() async {
-    if (kIsWeb) return;
-    try {
-      if (await Vibration.hasVibrator() ?? false) {
-        await Vibration.vibrate(duration: 200);
-      }
-    } catch (_) {}
+  /// Vibrate using the game-timer pattern.
+  Future<void> vibrateGameTimer() async {
+    if (!_gameTimerEnabled || kIsWeb) return;
+    await _executeVibration(_gameTimerPattern);
   }
 
-  /// Longer vibration pattern when a timer reaches zero.
-  static Future<void> vibrateEnd() async {
-    if (kIsWeb) return;
+  /// Vibrate using the damage-timer pattern.
+  Future<void> vibrateDamageTimer() async {
+    if (!_damageTimerEnabled || kIsWeb) return;
+    await _executeVibration(_damageTimerPattern);
+  }
+
+  /// Executes the given [pattern], falling back to a plain duration on
+  /// platforms that don't support custom vibration sequences (e.g. iOS).
+  static Future<void> _executeVibration(VibrationPattern pattern) async {
     try {
-      if (await Vibration.hasVibrator() ?? false) {
-        await Vibration.vibrate(pattern: [0, 400, 200, 400]);
+      final hasVibrator = await Vibration.hasVibrator() ?? false;
+      if (!hasVibrator) return;
+      final hasCustom =
+          await Vibration.hasCustomVibrationsSupport() ?? false;
+
+      switch (pattern) {
+        case VibrationPattern.short:
+          await Vibration.vibrate(duration: 200);
+        case VibrationPattern.long:
+          await Vibration.vibrate(duration: 600);
+        case VibrationPattern.doubleBuzz:
+          if (hasCustom) {
+            await Vibration.vibrate(pattern: [0, 200, 100, 200]);
+          } else {
+            await Vibration.vibrate(duration: 300);
+          }
+        case VibrationPattern.pulse:
+          if (hasCustom) {
+            await Vibration.vibrate(pattern: [0, 400, 200, 400]);
+          } else {
+            await Vibration.vibrate(duration: 500);
+          }
       }
     } catch (_) {}
   }
