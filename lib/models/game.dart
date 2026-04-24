@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:rcj_scoreboard/models/team.dart';
 import 'package:rcj_scoreboard/services/mqtt.dart';
 import 'package:rcj_scoreboard/services/match_data.dart';
+import 'package:rcj_scoreboard/services/vibration_service.dart';
 
 enum MatchStage {
   firstHalf,
@@ -32,6 +33,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
+  VibrationService vibrationService = VibrationService();
 
 
   // Callback to request showing the dialog
@@ -127,6 +129,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   void _tickTimer() {
     if (_remainingTime > 0) {
       _remainingTime--;
+      _checkGameTimerVibration();
       notifyAllModulesTimer();
       mqttService.publishTime(_remainingTime);
     }
@@ -248,10 +251,40 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   }
 
   void notifyAllModulesTimer() {
+    bool vibrateEndTriggered = false;
+    bool vibrateWarningTriggered = false;
+
     for (var team in teams) {
       for (var module in team.modules.where((module) => module.isEnabled && module.state == ModuleState.damage)) {
+        final penaltyBefore = module.penaltyTime;
         module.notifyTimer();
+
+        if (vibrationService.damageTimerEnabled && penaltyBefore > 0) {
+          final penaltyAfter = module.penaltyTime;
+          if (vibrationService.damageTimerAlerts.contains(penaltyAfter)) {
+            if (penaltyAfter == 0 && !vibrateEndTriggered) {
+              vibrateEndTriggered = true;
+              VibrationService.vibrateEnd();
+            } else if (penaltyAfter > 0 && !vibrateWarningTriggered) {
+              vibrateWarningTriggered = true;
+              VibrationService.vibrateWarning();
+            }
+          }
+        }
       }
+    }
+  }
+
+  void _checkGameTimerVibration() {
+    if (!vibrationService.gameTimerEnabled) return;
+    if (currentStage != MatchStage.firstHalf &&
+        currentStage != MatchStage.secondHalf) return;
+    if (!vibrationService.gameTimerAlerts.contains(_remainingTime)) return;
+
+    if (_remainingTime == 0) {
+      VibrationService.vibrateEnd();
+    } else {
+      VibrationService.vibrateWarning();
     }
   }
 
