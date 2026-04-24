@@ -291,6 +291,9 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
           _remainingTimeAtBackground! > _remainingTime) {
         alreadyProcessedTicks = _remainingTimeAtBackground! - _remainingTime;
       }
+      if (alreadyProcessedTicks > elapsedSeconds) {
+        alreadyProcessedTicks = elapsedSeconds;
+      }
 
       _backgroundedAt = null;
       _remainingTimeAtBackground = null;
