@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:rcj_scoreboard/models/module.dart';
 import 'dart:async';
 import 'package:rcj_scoreboard/models/team.dart';
@@ -12,7 +12,7 @@ enum MatchStage {
   fullTime,
 }
 
-class Game with ChangeNotifier {
+class Game with ChangeNotifier, WidgetsBindingObserver {
   String timerButtonText = 'START';
   final int _maxPlayer = 5;
   List<Team> teams = [];
@@ -27,7 +27,7 @@ class Game with ChangeNotifier {
   int _numberOfPlaying = 0;
   MatchStage currentStage = MatchStage.firstHalf;
   Timer? _timer;
-  DateTime? _lastTimerTickAt;
+  DateTime? _backgroundedAt;
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
@@ -37,6 +37,8 @@ class Game with ChangeNotifier {
   void Function()? onRequestSwitchTeamOrderDialog;
 
   Game() {
+    WidgetsBinding.instance.addObserver(this);
+
     String teamID;
 
     // A team (0)
@@ -111,42 +113,13 @@ class Game with ChangeNotifier {
       _isGameRunning = true;
     }
     isTimeRunning = true;
-    _lastTimerTickAt = DateTime.now();
+    _backgroundedAt = null;
     notifyListeners();
     _timer = Timer.periodic(Duration(seconds: 1), (_) {
-      if (!isTimeRunning) {
-        return;
-      }
-
-      final now = DateTime.now();
-      final lastTick = _lastTimerTickAt ?? now;
-      final elapsedSeconds = now.difference(lastTick).inSeconds;
-      // inSeconds truncates sub-second differences; skip until at least 1 full second elapsed.
-      if (elapsedSeconds <= 0) {
-        return;
-      }
-      _lastTimerTickAt = now;
-
-      final maxCatchUpTicks = _maxCatchUpTicks();
-      final ticksToProcess =
-          elapsedSeconds < maxCatchUpTicks ? elapsedSeconds : maxCatchUpTicks;
-      for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
+      if (isTimeRunning) {
         _tickTimer();
       }
     });
-  }
-
-  int _maxCatchUpTicks() {
-    switch (currentStage) {
-      case MatchStage.firstHalf:
-        return _remainingTime + halfTimeDuration + periodTime;
-      case MatchStage.halfTime:
-        return _remainingTime + periodTime;
-      case MatchStage.secondHalf:
-        return _remainingTime;
-      case MatchStage.fullTime:
-        return 0;
-    }
   }
 
   void _tickTimer() {
@@ -213,7 +186,7 @@ class Game with ChangeNotifier {
       _isGameRunning = false;
       isTimeRunning = false;
       _timer?.cancel();
-      _lastTimerTickAt = null;
+      _backgroundedAt = null;
       currentStage = MatchStage.secondHalf;
       _remainingTime = periodTime;
       stopAll(true, force: true);
@@ -271,8 +244,37 @@ class Game with ChangeNotifier {
     _isGameRunning = false;
     isTimeRunning = false;
     _timer?.cancel();
-    _lastTimerTickAt = null;
+    _backgroundedAt = null;
     notifyListeners();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!isTimeRunning) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _backgroundedAt ??= DateTime.now();
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed && _backgroundedAt != null) {
+      final elapsedSeconds = DateTime.now().difference(_backgroundedAt!).inSeconds;
+      _backgroundedAt = null;
+
+      for (var elapsedSecond = 0; elapsedSecond < elapsedSeconds && isTimeRunning; elapsedSecond++) {
+        _tickTimer();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
   }
 
 
