@@ -170,6 +170,19 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  int _maxResumeCatchUpTicks() {
+    switch (currentStage) {
+      case MatchStage.firstHalf:
+        return _remainingTime + halfTimeDuration + periodTime;
+      case MatchStage.halfTime:
+        return _remainingTime + periodTime;
+      case MatchStage.secondHalf:
+        return _remainingTime;
+      case MatchStage.fullTime:
+        return 0;
+    }
+  }
+
   void toggleTimer() {
     if (currentStage == MatchStage.firstHalf || currentStage == MatchStage.secondHalf) {
       if (_isGameRunning) {
@@ -264,7 +277,11 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       final elapsedSeconds = DateTime.now().difference(_backgroundedAt!).inSeconds;
       _backgroundedAt = null;
 
-      for (var elapsedSecond = 0; elapsedSecond < elapsedSeconds && isTimeRunning; elapsedSecond++) {
+      final maxResumeCatchUpTicks = _maxResumeCatchUpTicks();
+      final ticksToProcess = elapsedSeconds < maxResumeCatchUpTicks
+          ? elapsedSeconds
+          : maxResumeCatchUpTicks;
+      for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
         _tickTimer();
       }
     }
