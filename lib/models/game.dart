@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:rcj_scoreboard/models/module.dart';
 import 'dart:async';
 import 'package:rcj_scoreboard/models/team.dart';
@@ -12,7 +12,7 @@ enum MatchStage {
   fullTime,
 }
 
-class Game with ChangeNotifier {
+class Game with ChangeNotifier, WidgetsBindingObserver {
   String timerButtonText = 'START';
   final int _maxPlayer = 5;
   List<Team> teams = [];
@@ -27,6 +27,8 @@ class Game with ChangeNotifier {
   int _numberOfPlaying = 0;
   MatchStage currentStage = MatchStage.firstHalf;
   Timer? _timer;
+  DateTime? _runClockStartedAt;
+  int? _runClockStartRemainingTime;
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
@@ -36,6 +38,8 @@ class Game with ChangeNotifier {
   void Function()? onRequestSwitchTeamOrderDialog;
 
   Game() {
+    WidgetsBinding.instance.addObserver(this);
+
     String teamID;
 
     // A team (0)
@@ -110,55 +114,75 @@ class Game with ChangeNotifier {
       _isGameRunning = true;
     }
     isTimeRunning = true;
+    _runClockStartedAt = DateTime.now();
+    _runClockStartRemainingTime = _remainingTime;
     notifyListeners();
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (_remainingTime > 0) {
-        _remainingTime--;
-        notifyAllModulesTimer();
-        
-        mqttService.publishTime(_remainingTime);
+    _timer = Timer.periodic(Duration(seconds: 1), (_) {
+      if (isTimeRunning) {
+        _tickTimer();
       }
-
-      if (_remainingTime <= 0) {
-        _isGameRunning = false;
-        isTimeRunning = false;
-        timer.cancel();
-
-        switch (currentStage) {
-          case MatchStage.firstHalf:
-            currentStage = MatchStage.halfTime;
-            _remainingTime = halfTimeDuration;
-            startTimer();
-            timerButtonText = 'SKIP';
-            halfTimeAll();
-            // Trigger the callback to show the dialog
-            if (onRequestSwitchTeamOrderDialog != null) {
-              onRequestSwitchTeamOrderDialog!();
-            }
-          case MatchStage.halfTime:
-            currentStage = MatchStage.secondHalf;
-            _remainingTime = periodTime;
-            stopAll(true, force: true);
-            timerButtonText = 'START';
-          case MatchStage.secondHalf:
-            currentStage = MatchStage.fullTime;
-            stopAll(true);
-            timerButtonText = 'REPEAT';
-            gameOverAll();
-          default:
-            print('unknown match stage');
-        }
-
-        mqttService.publishGameState(currentStage);
-        mqttService.publishTime(_remainingTime);
-      }
-
-      if (currentStage == MatchStage.halfTime && _remainingTime % 30 == 0) {
-        halfTimeSyncTimeAll();
-      }
-
-      notifyListeners();
     });
+  }
+
+  void _tickTimer() {
+    if (_remainingTime > 0) {
+      _remainingTime--;
+      notifyAllModulesTimer();
+      mqttService.publishTime(_remainingTime);
+    }
+
+    if (_remainingTime <= 0) {
+      _isGameRunning = false;
+      isTimeRunning = false;
+      _timer?.cancel();
+
+      switch (currentStage) {
+        case MatchStage.firstHalf:
+          currentStage = MatchStage.halfTime;
+          _remainingTime = halfTimeDuration;
+          startTimer();
+          timerButtonText = 'SKIP';
+          halfTimeAll();
+          // Trigger the callback to show the dialog
+          if (onRequestSwitchTeamOrderDialog != null) {
+            onRequestSwitchTeamOrderDialog!();
+          }
+        case MatchStage.halfTime:
+          currentStage = MatchStage.secondHalf;
+          _remainingTime = periodTime;
+          stopAll(true, force: true);
+          timerButtonText = 'START';
+        case MatchStage.secondHalf:
+          currentStage = MatchStage.fullTime;
+          stopAll(true);
+          timerButtonText = 'REPEAT';
+          gameOverAll();
+        default:
+          print('unknown match stage');
+      }
+
+      mqttService.publishGameState(currentStage);
+      mqttService.publishTime(_remainingTime);
+    }
+
+    if (currentStage == MatchStage.halfTime && _remainingTime % 30 == 0) {
+      halfTimeSyncTimeAll();
+    }
+
+    notifyListeners();
+  }
+
+  int _maxResumeCatchUpTicks() {
+    switch (currentStage) {
+      case MatchStage.firstHalf:
+        return _remainingTime + halfTimeDuration + periodTime;
+      case MatchStage.halfTime:
+        return _remainingTime + periodTime;
+      case MatchStage.secondHalf:
+        return _remainingTime;
+      case MatchStage.fullTime:
+        return 0;
+    }
   }
 
   void toggleTimer() {
@@ -177,6 +201,8 @@ class Game with ChangeNotifier {
       _isGameRunning = false;
       isTimeRunning = false;
       _timer?.cancel();
+      _runClockStartedAt = null;
+      _runClockStartRemainingTime = null;
       currentStage = MatchStage.secondHalf;
       _remainingTime = periodTime;
       stopAll(true, force: true);
@@ -234,7 +260,51 @@ class Game with ChangeNotifier {
     _isGameRunning = false;
     isTimeRunning = false;
     _timer?.cancel();
+    _runClockStartedAt = null;
+    _runClockStartRemainingTime = null;
     notifyListeners();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!isTimeRunning) {
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed &&
+        _runClockStartedAt != null &&
+        _runClockStartRemainingTime != null) {
+      final elapsedSeconds = DateTime.now().difference(_runClockStartedAt!).inSeconds;
+      final expectedRemaining = (_runClockStartRemainingTime! - elapsedSeconds)
+          .clamp(0, _runClockStartRemainingTime!)
+          .toInt();
+
+      if (_remainingTime < expectedRemaining) {
+        _remainingTime = expectedRemaining;
+        mqttService.publishTime(_remainingTime);
+        notifyListeners();
+        return;
+      }
+
+      // If remaining time is higher than expected, the local timer lagged behind.
+      final ticksBehind = _remainingTime > expectedRemaining
+          ? _remainingTime - expectedRemaining
+          : 0;
+      final maxResumeCatchUpTicks = _maxResumeCatchUpTicks();
+      final ticksToProcess = ticksBehind < maxResumeCatchUpTicks
+          ? ticksBehind
+          : maxResumeCatchUpTicks;
+      for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
+        _tickTimer();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
   }
 
 
@@ -404,5 +474,3 @@ int getScore(String team, {bool oppositeTeam = false}) {
   }
 
 }
-
-
