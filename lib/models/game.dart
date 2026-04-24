@@ -286,7 +286,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
         return;
       }
 
-      // If remaining time is higher than expected, local ticking lagged behind.
+      // If remaining time is higher than expected, the local timer lagged behind.
       final ticksBehind = _remainingTime > expectedRemaining
           ? _remainingTime - expectedRemaining
           : 0;
