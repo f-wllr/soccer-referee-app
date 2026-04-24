@@ -36,9 +36,21 @@ class VibrationService with ChangeNotifier {
 
   late SharedPreferences _prefs;
   bool _prefsLoaded = false;
+  bool _hasVibrator = false;
+  bool _hasCustomVibrations = false;
 
   VibrationService() {
     _loadPreferences();
+    _initVibrationCapabilities();
+  }
+
+  Future<void> _initVibrationCapabilities() async {
+    if (kIsWeb) return;
+    try {
+      _hasVibrator = await Vibration.hasVibrator() ?? false;
+      _hasCustomVibrations =
+          await Vibration.hasCustomVibrationsSupport() ?? false;
+    } catch (_) {}
   }
 
   Future<void> _loadPreferences() async {
@@ -147,25 +159,21 @@ class VibrationService with ChangeNotifier {
 
   /// Vibrate using the game-timer pattern.
   Future<void> vibrateGameTimer() async {
-    if (!_gameTimerEnabled || kIsWeb) return;
-    await _executeVibration(_gameTimerPattern);
+    if (!_gameTimerEnabled || kIsWeb || !_hasVibrator) return;
+    await _executeVibration(_gameTimerPattern, _hasCustomVibrations);
   }
 
   /// Vibrate using the damage-timer pattern.
   Future<void> vibrateDamageTimer() async {
-    if (!_damageTimerEnabled || kIsWeb) return;
-    await _executeVibration(_damageTimerPattern);
+    if (!_damageTimerEnabled || kIsWeb || !_hasVibrator) return;
+    await _executeVibration(_damageTimerPattern, _hasCustomVibrations);
   }
 
   /// Executes the given [pattern], falling back to a plain duration on
   /// platforms that don't support custom vibration sequences (e.g. iOS).
-  static Future<void> _executeVibration(VibrationPattern pattern) async {
+  static Future<void> _executeVibration(
+      VibrationPattern pattern, bool hasCustom) async {
     try {
-      final hasVibrator = await Vibration.hasVibrator() ?? false;
-      if (!hasVibrator) return;
-      final hasCustom =
-          await Vibration.hasCustomVibrationsSupport() ?? false;
-
       switch (pattern) {
         case VibrationPattern.short:
           await Vibration.vibrate(duration: 200);
@@ -175,7 +183,7 @@ class VibrationService with ChangeNotifier {
           if (hasCustom) {
             await Vibration.vibrate(pattern: [0, 200, 100, 200]);
           } else {
-            await Vibration.vibrate(duration: 300);
+            await Vibration.vibrate(duration: 500);
           }
         case VibrationPattern.pulse:
           if (hasCustom) {
