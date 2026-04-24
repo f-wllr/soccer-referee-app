@@ -28,6 +28,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   MatchStage currentStage = MatchStage.firstHalf;
   Timer? _timer;
   DateTime? _backgroundedAt;
+  int? _remainingTimeAtBackground;
+  MatchStage? _stageAtBackground;
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
@@ -114,6 +116,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
     }
     isTimeRunning = true;
     _backgroundedAt = null;
+    _remainingTimeAtBackground = null;
+    _stageAtBackground = null;
     notifyListeners();
     _timer = Timer.periodic(Duration(seconds: 1), (_) {
       if (isTimeRunning) {
@@ -200,6 +204,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       isTimeRunning = false;
       _timer?.cancel();
       _backgroundedAt = null;
+      _remainingTimeAtBackground = null;
+      _stageAtBackground = null;
       currentStage = MatchStage.secondHalf;
       _remainingTime = periodTime;
       stopAll(true, force: true);
@@ -258,6 +264,8 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
     isTimeRunning = false;
     _timer?.cancel();
     _backgroundedAt = null;
+    _remainingTimeAtBackground = null;
+    _stageAtBackground = null;
     notifyListeners();
   }
 
@@ -269,16 +277,32 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
 
     if (state == AppLifecycleState.paused) {
       _backgroundedAt = DateTime.now();
+      _remainingTimeAtBackground = _remainingTime;
+      _stageAtBackground = currentStage;
       return;
     }
 
     if (state == AppLifecycleState.resumed && _backgroundedAt != null) {
       final elapsedSeconds = DateTime.now().difference(_backgroundedAt!).inSeconds;
+
+      var alreadyProcessedTicks = 0;
+      if (_remainingTimeAtBackground != null &&
+          _stageAtBackground == currentStage &&
+          _remainingTimeAtBackground! > _remainingTime) {
+        alreadyProcessedTicks = _remainingTimeAtBackground! - _remainingTime;
+      }
+
       _backgroundedAt = null;
+      _remainingTimeAtBackground = null;
+      _stageAtBackground = null;
+
+      final effectiveElapsedSeconds = elapsedSeconds > alreadyProcessedTicks
+          ? elapsedSeconds - alreadyProcessedTicks
+          : 0;
 
       final maxResumeCatchUpTicks = _maxResumeCatchUpTicks();
-      final ticksToProcess = elapsedSeconds < maxResumeCatchUpTicks
-          ? elapsedSeconds
+      final ticksToProcess = effectiveElapsedSeconds < maxResumeCatchUpTicks
+          ? effectiveElapsedSeconds
           : maxResumeCatchUpTicks;
       for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
         _tickTimer();
