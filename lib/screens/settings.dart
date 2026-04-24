@@ -338,7 +338,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   vs.gameTimerEnabled = value;
                                 },
                               ),
-                              if (vs.gameTimerEnabled) ...[
+                              if (vs.gameTimerEnabled)
                                 SettingAlertChips(
                                   label: 'Alert at (sec remaining)',
                                   options: kVibrationAlertOptions,
@@ -347,14 +347,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     vs.toggleGameTimerAlert(sec);
                                   },
                                 ),
-                                SettingPatternDropdown(
-                                  title: 'Pattern',
-                                  value: vs.gameTimerPattern,
-                                  onChanged: (value) {
-                                    if (value != null) vs.gameTimerPattern = value;
-                                  },
-                                ),
-                              ],
                               SettingSwitch(
                                 title: 'Damage Timer Vibration',
                                 value: vs.damageTimerEnabled,
@@ -362,7 +354,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   vs.damageTimerEnabled = value;
                                 },
                               ),
-                              if (vs.damageTimerEnabled) ...[
+                              if (vs.damageTimerEnabled)
                                 SettingAlertChips(
                                   label: 'Alert at (sec remaining)',
                                   options: kVibrationAlertOptions,
@@ -371,14 +363,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     vs.toggleDamageTimerAlert(sec);
                                   },
                                 ),
-                                SettingPatternDropdown(
-                                  title: 'Pattern',
-                                  value: vs.damageTimerPattern,
-                                  onChanged: (value) {
-                                    if (value != null) vs.damageTimerPattern = value;
-                                  },
-                                ),
-                              ],
                             ],
                           );
                         },
@@ -778,47 +762,6 @@ class SettingSwitch extends StatelessWidget {
 }
 
 
-
-// SettingPatternDropdown widget for selecting a VibrationPattern per timer type
-class SettingPatternDropdown extends StatelessWidget {
-  final String title;
-  final VibrationPattern value;
-  final ValueChanged<VibrationPattern?> onChanged;
-
-  const SettingPatternDropdown({
-    required this.title,
-    required this.value,
-    required this.onChanged,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(flex: 5, child: Text(title)),
-          Expanded(
-            flex: 3,
-            child: DropdownButton<VibrationPattern>(
-              value: value,
-              isExpanded: true,
-              onChanged: onChanged,
-              items: VibrationPattern.values.map((p) {
-                return DropdownMenuItem<VibrationPattern>(
-                  value: p,
-                  child: Text(p.displayName, overflow: TextOverflow.ellipsis),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // SettingAlertChips widget for multi-select vibration alert thresholds
 class SettingAlertChips extends StatelessWidget {

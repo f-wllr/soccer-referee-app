@@ -274,6 +274,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   void _checkGameTimerVibration() {
     if (!vibrationService.gameTimerEnabled) return;
     if (currentStage != MatchStage.firstHalf &&
+        currentStage != MatchStage.halfTime &&
         currentStage != MatchStage.secondHalf) return;
     if (!vibrationService.gameTimerAlerts.contains(_remainingTime)) return;
 
