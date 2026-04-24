@@ -287,10 +287,13 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
 
       var alreadyProcessedTicks = 0;
       if (_remainingTimeAtBackground != null &&
+          _remainingTimeAtBackground! >= 0 &&
+          _remainingTime >= 0 &&
           _stageAtBackground == currentStage &&
           _remainingTimeAtBackground! > _remainingTime) {
         alreadyProcessedTicks = _remainingTimeAtBackground! - _remainingTime;
       }
+      // Never discount more ticks than elapsed wall-clock seconds.
       if (alreadyProcessedTicks > elapsedSeconds) {
         alreadyProcessedTicks = elapsedSeconds;
       }
