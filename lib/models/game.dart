@@ -341,8 +341,19 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   void _scheduleBackgroundNotifications() {
     // Game timer
     if (vibrationService.gameTimerEnabled) {
-      NotificationService.scheduleGameAlerts(
-          _remainingTime, vibrationService.gameTimerAlerts);
+      switch (currentStage) {
+        case MatchStage.firstHalf:
+          NotificationService.scheduleGameAlerts(
+              _remainingTime, vibrationService.gameTimerAlerts);
+        case MatchStage.halfTime:
+          NotificationService.scheduleBreakAlerts(
+              _remainingTime, vibrationService.gameTimerAlerts);
+        case MatchStage.secondHalf:
+        NotificationService.scheduleGameAlerts(
+            _remainingTime, vibrationService.gameTimerAlerts);
+        default:
+          print('unknown match stage');
+      }
     }
     // Damage timers – one notification set per module currently in damage state.
     if (vibrationService.damageTimerEnabled) {

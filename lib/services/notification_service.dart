@@ -67,7 +67,33 @@ class NotificationService {
           'Game Timer',
           threshold == 0 ? 'Time is up! Open the app to start the next timer' : '$threshold seconds remaining',
           now.add(Duration(seconds: delay)),
-          NotificationDetails(
+          const NotificationDetails(
+            android: _androidGameChannel,
+            iOS: _iosDetails,
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Schedule a notification for each [threshold] still in the future.
+  ///
+  /// [remainingSeconds] is how many seconds are left on the game timer right now.
+  static Future<void> scheduleBreakAlerts(
+      int remainingSeconds, Set<int> thresholds) async {
+    if (kIsWeb) return;
+    final now = tz.TZDateTime.now(tz.local);
+    for (final threshold in thresholds) {
+      final delay = remainingSeconds - threshold;
+      if (delay <= 0) continue;
+      try {
+        await _plugin.zonedSchedule(
+          10000 + threshold,
+          'Break Timer',
+          threshold == 0 ? 'Time is up! Open the app to start the second half timer' : '$threshold seconds remaining',
+          now.add(Duration(seconds: delay)),
+          const NotificationDetails(
             android: _androidGameChannel,
             iOS: _iosDetails,
           ),
@@ -98,7 +124,7 @@ class NotificationService {
               ? 'Penalty time is up!'
               : '$threshold seconds remaining',
           now.add(Duration(seconds: delay)),
-          NotificationDetails(
+          const NotificationDetails(
             android: _androidDamageChannel,
             iOS: _iosDetails,
           ),
