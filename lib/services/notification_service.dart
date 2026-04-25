@@ -72,8 +72,6 @@ class NotificationService {
             iOS: _iosDetails,
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
         );
       } catch (_) {}
     }
@@ -105,8 +103,6 @@ class NotificationService {
             iOS: _iosDetails,
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
         );
       } catch (_) {}
     }
