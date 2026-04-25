@@ -32,6 +32,7 @@ enum BleMsgId {
 
 class Module with ChangeNotifier {
   final String _name;
+  String? _label;
   final String _team_id;
   final Game _game;
   final int moduleId;
@@ -215,7 +216,8 @@ class Module with ChangeNotifier {
   Future<bool> bleSendName() async {
     if (!_isConnected) return false;
     try {
-      await bleTX?.write([BleMsgId.bleMsgSetName.index] + _name.substring(0,2).codeUnits);
+      final displayName = name.padRight(2).substring(0, 2);
+      await bleTX?.write([BleMsgId.bleMsgSetName.index] + displayName.codeUnits);
       return true;
     } catch (e) {
       print('Send name error');
@@ -535,9 +537,15 @@ class Module with ChangeNotifier {
   bool get isEnabled => _isEnabled;
   bool get isConnected => _isConnected;
   bool get isPlaying => _isPlaying;
-  String get name => _name;
+  String get name => (_label != null && _label!.isNotEmpty) ? _label! : _name;
+  String get defaultName => _name;
   int get penaltyTime => _penaltyTime;
   ModuleState get state => _state;
+
+  void setLabel(String label) {
+    _label = label.trim();
+    notifyListeners();
+  }
 
 }
 
