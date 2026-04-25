@@ -157,7 +157,7 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
 
     if (setLabelFromModule) {
       setLabelFromModule = false;
-      _labelController.text = module.name != module.defaultName ? module.name : '';
+      _labelController.text = module.hasCustomLabel ? module.name : '';
     }
 
 
@@ -208,6 +208,8 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
                       labelStyle: TextStyle(color: Colors.grey),
                       hintText: module.defaultName,
                       hintStyle: TextStyle(color: Colors.grey),
+                      helperText: 'First 2 characters shown on robot display',
+                      helperStyle: TextStyle(color: Colors.grey),
                       border: OutlineInputBorder(),
                     ),
                     style: TextStyle(color: Colors.white),

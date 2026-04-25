@@ -539,6 +539,7 @@ class Module with ChangeNotifier {
   bool get isPlaying => _isPlaying;
   String get name => (_label != null && _label!.isNotEmpty) ? _label! : _name;
   String get defaultName => _name;
+  bool get hasCustomLabel => _label != null && _label!.isNotEmpty;
   int get penaltyTime => _penaltyTime;
   ModuleState get state => _state;
 
