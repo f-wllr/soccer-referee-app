@@ -65,7 +65,7 @@ class NotificationService {
         await _plugin.zonedSchedule(
           10000 + threshold,
           'Game Timer',
-          threshold == 0 ? 'Time is up!' : '$threshold seconds remaining',
+          threshold == 0 ? 'Time is up! Open the app to start the next timer' : '$threshold seconds remaining',
           now.add(Duration(seconds: delay)),
           NotificationDetails(
             android: _androidGameChannel,
