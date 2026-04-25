@@ -27,7 +27,7 @@ class NotificationService {
     playSound: false,
   );
 
-  static const _iosDetails = DarwinNotificationDetails(presentSound: false);
+  static const _iosDetails = DarwinNotificationDetails(presentSound: true);
 
   /// One-time initialisation – call from main() after ensureInitialized().
   static Future<void> initialize() async {
@@ -38,7 +38,7 @@ class NotificationService {
       const ios = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: false,
-        requestSoundPermission: false,
+        requestSoundPermission: true,
       );
       await _plugin.initialize(
         const InitializationSettings(android: android, iOS: ios),
