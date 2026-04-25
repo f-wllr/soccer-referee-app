@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/game.dart';
 import '../services/mqtt.dart';
+import '../services/vibration_service.dart';
 import '../utils/colors.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -321,6 +322,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             },
                           ),
                         ],
+                      ),
+                      AnimatedBuilder(
+                        animation: widget.game.vibrationService,
+                        builder: (context, child) {
+                          final vs = widget.game.vibrationService;
+                          return SettingsSection(
+                            title: 'Vibration',
+                            locked: false,
+                            settings: [
+                              SettingSwitch(
+                                title: 'Game Timer Vibration',
+                                value: vs.gameTimerEnabled,
+                                onChanged: (value) {
+                                  vs.gameTimerEnabled = value;
+                                },
+                              ),
+                              if (vs.gameTimerEnabled)
+                                SettingAlertChips(
+                                  label: 'Alert at (sec remaining)',
+                                  options: kVibrationAlertOptions,
+                                  selected: vs.gameTimerAlerts,
+                                  onToggle: (sec) {
+                                    vs.toggleGameTimerAlert(sec);
+                                  },
+                                ),
+                              SettingSwitch(
+                                title: 'Damage Timer Vibration',
+                                value: vs.damageTimerEnabled,
+                                onChanged: (value) {
+                                  vs.damageTimerEnabled = value;
+                                },
+                              ),
+                              if (vs.damageTimerEnabled)
+                                SettingAlertChips(
+                                  label: 'Alert at (sec remaining)',
+                                  options: kVibrationAlertOptions,
+                                  selected: vs.damageTimerAlerts,
+                                  onToggle: (sec) {
+                                    vs.toggleDamageTimerAlert(sec);
+                                  },
+                                ),
+                            ],
+                          );
+                        },
                       ),
                       SettingsSection(
                         title: 'About',
@@ -718,39 +763,51 @@ class SettingSwitch extends StatelessWidget {
 
 
 
-// class SettingStatus extends StatelessWidget {
-//   final String title;
-//   final String status;
-//
-//   SettingStatus({required this.title, required this.status});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(vertical: 8.0),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//         children: [
-//           Expanded(
-//             flex: 3,
-//             child: Text(title)
-//           ),
-//           Expanded(
-//             flex: 2,
-//             child: Align(
-//               alignment: Alignment.centerRight,
-//               child: Text(
-//                 status,
-//                 style: const TextStyle(color: Colors.white),
-//                 textAlign: TextAlign.right,
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+// SettingAlertChips widget for multi-select vibration alert thresholds
+class SettingAlertChips extends StatelessWidget {
+  final String label;
+  final List<int> options;
+  final Set<int> selected;
+  final void Function(int) onToggle;
+
+  const SettingAlertChips({
+    required this.label,
+    required this.options,
+    required this.selected,
+    required this.onToggle,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            children: options.map((sec) {
+              final isSelected = selected.contains(sec);
+              return FilterChip(
+                label: Text(sec == 0 ? '0 (end)' : '${sec}s'),
+                selected: isSelected,
+                onSelected: (_) => onToggle(sec),
+                selectedColor: Colors.blue,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class SetItem {
   final int values;

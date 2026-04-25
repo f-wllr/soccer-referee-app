@@ -34,6 +34,7 @@ class Module with ChangeNotifier {
   final String _name;
   final String _team_id;
   final Game _game;
+  final int moduleId;
   final String _serviceUUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
   final String _characteristicUUIDTX = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E";
   final String _characteristicUUIDRX = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E";
@@ -56,7 +57,7 @@ class Module with ChangeNotifier {
   BluetoothCharacteristic? bleRX;
 
 
-  Module(this._game, this._team_id, this._name);
+  Module(this._game, this._team_id, this._name, this.moduleId);
 
   void init() {
     _stop();

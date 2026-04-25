@@ -4,6 +4,8 @@ import 'dart:async';
 import 'package:rcj_scoreboard/models/team.dart';
 import 'package:rcj_scoreboard/services/mqtt.dart';
 import 'package:rcj_scoreboard/services/match_data.dart';
+import 'package:rcj_scoreboard/services/notification_service.dart';
+import 'package:rcj_scoreboard/services/vibration_service.dart';
 
 enum MatchStage {
   firstHalf,
@@ -32,6 +34,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   //MQTT
   MqttService mqttService = MqttService();
   MatchDataService matchDataService = MatchDataService();
+  VibrationService vibrationService = VibrationService();
 
 
   // Callback to request showing the dialog
@@ -44,20 +47,20 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
 
     // A team (0)
     teamID = 'A';
-    Module moduleA1 = Module(this, teamID, 'A1');
-    Module moduleA2 = Module(this, teamID, 'A2');
-    Module moduleA3 = Module(this, teamID, 'A3');
-    Module moduleA4 = Module(this, teamID, 'A4');
-    Module moduleA5 = Module(this, teamID, 'A5');
+    Module moduleA1 = Module(this, teamID, 'A1', 0);
+    Module moduleA2 = Module(this, teamID, 'A2', 1);
+    Module moduleA3 = Module(this, teamID, 'A3', 2);
+    Module moduleA4 = Module(this, teamID, 'A4', 3);
+    Module moduleA5 = Module(this, teamID, 'A5', 4);
     teams.add(Team('Team A', [moduleA1, moduleA2, moduleA3, moduleA4 ,moduleA5], teamID));
 
     // B team (1)
     teamID = 'B';
-    Module moduleB1 = Module(this, teamID, 'B1');
-    Module moduleB2 = Module(this, teamID, 'B2');
-    Module moduleB3 = Module(this, teamID, 'B3');
-    Module moduleB4 = Module(this, teamID, 'B4');
-    Module moduleB5 = Module(this, teamID, 'B5');
+    Module moduleB1 = Module(this, teamID, 'B1', 5);
+    Module moduleB2 = Module(this, teamID, 'B2', 6);
+    Module moduleB3 = Module(this, teamID, 'B3', 7);
+    Module moduleB4 = Module(this, teamID, 'B4', 8);
+    Module moduleB5 = Module(this, teamID, 'B5', 9);
     teams.add(Team('Team B', [moduleB1, moduleB2, moduleB3, moduleB4 ,moduleB5], teamID));
 
 
@@ -127,6 +130,7 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   void _tickTimer() {
     if (_remainingTime > 0) {
       _remainingTime--;
+      _checkGameTimerVibration();
       notifyAllModulesTimer();
       mqttService.publishTime(_remainingTime);
     }
@@ -248,11 +252,34 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
   }
 
   void notifyAllModulesTimer() {
+    // Use a flag so that at most one vibration fires per timer tick even if
+    // multiple modules hit a threshold simultaneously.
+    bool vibrateTriggered = false;
+
     for (var team in teams) {
       for (var module in team.modules.where((module) => module.isEnabled && module.state == ModuleState.damage)) {
+        final penaltyBefore = module.penaltyTime;
         module.notifyTimer();
+
+        if (!vibrateTriggered && vibrationService.damageTimerEnabled && penaltyBefore > 0) {
+          final penaltyAfter = module.penaltyTime;
+          if (vibrationService.damageTimerAlerts.contains(penaltyAfter)) {
+            vibrateTriggered = true;
+            vibrationService.vibrateDamageTimer();
+          }
+        }
       }
     }
+  }
+
+  void _checkGameTimerVibration() {
+    if (!vibrationService.gameTimerEnabled) return;
+    if (currentStage != MatchStage.firstHalf &&
+        currentStage != MatchStage.halfTime &&
+        currentStage != MatchStage.secondHalf) return;
+    if (!vibrationService.gameTimerAlerts.contains(_remainingTime)) return;
+
+    vibrationService.vibrateGameTimer();
   }
 
 
@@ -271,31 +298,72 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
       return;
     }
 
-    if (state == AppLifecycleState.resumed &&
-        _runClockStartedAt != null &&
-        _runClockStartRemainingTime != null) {
-      final elapsedSeconds = DateTime.now().difference(_runClockStartedAt!).inSeconds;
-      final expectedRemaining = (_runClockStartRemainingTime! - elapsedSeconds)
-          .clamp(0, _runClockStartRemainingTime!)
-          .toInt();
+    if (state == AppLifecycleState.paused) {
+      // Schedule notifications for all active timers so the referee is alerted
+      // even when the app is backgrounded or the screen is off.
+      _scheduleBackgroundNotifications();
+      return;
+    }
 
-      if (_remainingTime < expectedRemaining) {
-        _remainingTime = expectedRemaining;
-        mqttService.publishTime(_remainingTime);
-        notifyListeners();
-        return;
+    if (state == AppLifecycleState.resumed) {
+      // Cancel scheduled notifications now that the app is active again –
+      // the vibration mechanism handles in-app alerts.
+      NotificationService.cancelAll();
+
+      if (_runClockStartedAt != null && _runClockStartRemainingTime != null) {
+        final elapsedSeconds = DateTime.now().difference(_runClockStartedAt!).inSeconds;
+        final expectedRemaining = (_runClockStartRemainingTime! - elapsedSeconds)
+            .clamp(0, _runClockStartRemainingTime!)
+            .toInt();
+
+        if (_remainingTime < expectedRemaining) {
+          _remainingTime = expectedRemaining;
+          mqttService.publishTime(_remainingTime);
+          notifyListeners();
+          return;
+        }
+
+        // If remaining time is higher than expected, the local timer lagged behind.
+        final ticksBehind = _remainingTime > expectedRemaining
+            ? _remainingTime - expectedRemaining
+            : 0;
+        final maxResumeCatchUpTicks = _maxResumeCatchUpTicks();
+        final ticksToProcess = ticksBehind < maxResumeCatchUpTicks
+            ? ticksBehind
+            : maxResumeCatchUpTicks;
+        for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
+          _tickTimer();
+        }
       }
+    }
+  }
 
-      // If remaining time is higher than expected, the local timer lagged behind.
-      final ticksBehind = _remainingTime > expectedRemaining
-          ? _remainingTime - expectedRemaining
-          : 0;
-      final maxResumeCatchUpTicks = _maxResumeCatchUpTicks();
-      final ticksToProcess = ticksBehind < maxResumeCatchUpTicks
-          ? ticksBehind
-          : maxResumeCatchUpTicks;
-      for (var tickIndex = 0; tickIndex < ticksToProcess && isTimeRunning; tickIndex++) {
-        _tickTimer();
+  void _scheduleBackgroundNotifications() {
+    // Game timer
+    if (vibrationService.gameTimerEnabled) {
+      switch (currentStage) {
+        case MatchStage.firstHalf:
+          NotificationService.scheduleGameAlerts(
+              _remainingTime, vibrationService.gameTimerAlerts);
+        case MatchStage.halfTime:
+          NotificationService.scheduleBreakAlerts(
+              _remainingTime, vibrationService.gameTimerAlerts);
+        case MatchStage.secondHalf:
+        NotificationService.scheduleGameAlerts(
+            _remainingTime, vibrationService.gameTimerAlerts);
+        default:
+          print('unknown match stage');
+      }
+    }
+    // Damage timers – one notification set per module currently in damage state.
+    if (vibrationService.damageTimerEnabled) {
+      for (final team in teams) {
+        for (final module in team.modules.where(
+            (m) => m.isEnabled && m.state == ModuleState.damage && m.penaltyTime > 0)) {
+          NotificationService.scheduleDamageAlerts(
+              module.moduleId, module.name, module.penaltyTime,
+              vibrationService.damageTimerAlerts);
+        }
       }
     }
   }
