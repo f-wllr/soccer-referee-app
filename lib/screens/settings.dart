@@ -152,6 +152,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               setState(() {
                                 widget.game.setTeamToDefaultOrder();
                                 widget.game.gameInit();
+                                widget.game.resetModuleNames();
                               });
                             },
                           ),
