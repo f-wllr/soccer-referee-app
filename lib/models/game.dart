@@ -251,6 +251,14 @@ class Game with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  void resetModuleNames(){
+    for (var team in teams) {
+      for (var module in team.modules.where((module) => module.isEnabled && module.hasCustomLabel)) {
+        module.setLabel(module.defaultName);
+      }
+    }
+  }
+
   void notifyAllModulesTimer() {
     // Use a flag so that at most one vibration fires per timer tick even if
     // multiple modules hit a threshold simultaneously.

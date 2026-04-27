@@ -31,8 +31,10 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
   int? selectedIndex;
 
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _labelController = TextEditingController();
 
   bool setMacFromModule = true;
+  bool setLabelFromModule = true;
 
   bool bleIsScanning = false;
 
@@ -129,6 +131,7 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
   void dispose() {
     //SystemChannels.textInput.invokeMethod('TextInput.hide');
     _controller.dispose();
+    _labelController.dispose();
     FlutterBluePlus.stopScan();
     super.dispose();
   }
@@ -150,6 +153,11 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
     if (setMacFromModule) {
       setMacFromModule = false;
       _controller.text = module.macAddress;
+    }
+
+    if (setLabelFromModule) {
+      setLabelFromModule = false;
+      _labelController.text = module.hasCustomLabel ? module.name : '';
     }
 
 
@@ -181,6 +189,42 @@ class _ModuleSettingsScreen extends State<ModuleSettingsScreen> {
                 Text(
                   deviceStatus == 'OK' ? module.bleStatus : deviceStatus,
                   style: TextStyle(fontSize: 18),
+                ),
+              ],
+            ),
+
+            SizedBox(height: 10),
+            Divider(),
+            SizedBox(height: 10),
+
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _labelController,
+                    decoration: InputDecoration(
+                      labelText: 'Bot label (default: ${module.defaultName})',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      hintText: module.defaultName,
+                      hintStyle: TextStyle(color: Colors.grey),
+                      helperText: 'First 2 characters shown on robot display',
+                      helperStyle: TextStyle(color: Colors.grey),
+                      border: OutlineInputBorder(),
+                    ),
+                    style: TextStyle(color: Colors.white),
+                    maxLength: 10,
+                  ),
+                ),
+                SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[700],
+                  ),
+                  onPressed: () {
+                    module.setLabel(_labelController.text);
+                  },
+                  child: Text('Save', style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
