@@ -370,7 +370,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(vertical: 4.0),
-                            child: Text('Version: 0.9.7', style: TextStyle(fontSize: 14)),
+                            child: Text('Version: 0.10.0', style: TextStyle(fontSize: 14)),
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(vertical: 4.0),
@@ -424,7 +424,7 @@ class SettingsSection extends StatelessWidget {
                   Switch(
                     value: enabled!,
                     onChanged: onToggle,
-                    activeColor: Colors.blue,
+                    activeThumbColor: Colors.blue,
                   ),
                 if (locked) const Icon(Icons.lock, color: Colors.white),
               ]),
@@ -718,7 +718,7 @@ class SettingSwitch extends StatelessWidget {
             child: Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: Colors.blue,
+              activeThumbColor: Colors.blue,
             ),
           ),
         ],
